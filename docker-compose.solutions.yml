@@ -1,0 +1,18 @@
+# `make up-temporal SOLUTION=1`: run the finished checkout and support services instead of yours.
+services:
+  checkout:
+    build: ./solutions/checkout
+    volumes: !override
+      - ./solutions/checkout:/app
+  worker:
+    build: ./solutions/checkout
+    volumes: !override
+      - ./solutions/checkout:/app
+  support:
+    build: ./solutions/support
+    volumes: !override
+      - ./solutions/support:/app
+  support-worker:
+    build: ./solutions/support
+    volumes: !override
+      - ./solutions/support:/app

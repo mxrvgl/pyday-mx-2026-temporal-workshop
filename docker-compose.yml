@@ -1,0 +1,129 @@
+name: payments-workshop
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: shop
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "shop", "-d", "shop"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  payment_provider:
+    build: ./payment_provider
+    ports: ["${PROVIDER_PORT:-8002}:8000"]
+    healthcheck: &http-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  inventory:
+    build: ./inventory
+    ports: ["${INVENTORY_PORT:-8001}:8000"]
+    environment:
+      DATABASE_URL: postgresql://shop:shop@postgres:5432/shop
+    healthcheck: *http-health
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  # --- the checkout service: the code you change -----------------------------
+
+  checkout:
+    build: ./checkout
+    command: uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+    ports: ["${CHECKOUT_PORT:-8000}:8000"]
+    volumes:
+      - ${CHECKOUT_CODE:-./checkout}:/app  # your edits show up without a rebuild
+    environment: &checkout-env
+      DATABASE_URL: postgresql://shop:shop@postgres:5432/shop
+      INVENTORY_URL: http://inventory:8000
+      PAYMENT_PROVIDER_URL: http://payment_provider:8000
+      TEMPORAL_ADDRESS: temporal:7233
+      STEP_DELAY_S: ${STEP_DELAY_S:-2}
+    healthcheck:
+      <<: *http-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/docs')"]
+    depends_on:
+      inventory: {condition: service_healthy}
+      payment_provider: {condition: service_healthy}
+
+  # --- the support agent (Part 2): the code you change next ---------------------
+
+  support:
+    build: ./support
+    command: uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+    ports: ["${SUPPORT_PORT:-8003}:8000"]
+    volumes:
+      - ${SUPPORT_CODE:-./support}:/app
+    environment: &support-env
+      DATABASE_URL: postgresql://shop:shop@postgres:5432/shop
+      PAYMENT_PROVIDER_URL: http://payment_provider:8000
+      TEMPORAL_ADDRESS: temporal:7233
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AGENT_MODEL: ${AGENT_MODEL:-claude-haiku-5-5}
+      STEP_DELAY_S: ${STEP_DELAY_S:-2}
+    healthcheck: *http-health
+    depends_on:
+      postgres: {condition: service_healthy}
+      payment_provider: {condition: service_healthy}
+
+  # --- Temporal: `make up-temporal`, from step 3 on --------------------------
+
+  temporal:
+    profiles: ["temporal"]
+    image: temporalio/temporal:1.9.1
+    command: server start-dev --ip 0.0.0.0 --ui-ip 0.0.0.0
+    ports: ["${TEMPORAL_PORT:-7233}:7233", "${TEMPORAL_UI_PORT:-8233}:8233"]
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "127.0.0.1:7233"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  worker:  # same image and code as checkout, different command: your worker.py
+    profiles: ["temporal"]
+    build: ./checkout
+    command: python worker.py
+    init: true
+    volumes:
+      - ${CHECKOUT_CODE:-./checkout}:/app
+    environment: *checkout-env
+    depends_on:
+      temporal: {condition: service_healthy}
+      inventory: {condition: service_healthy}
+      payment_provider: {condition: service_healthy}
+
+  support-worker:  # same image and code as support: your support/worker.py
+    profiles: ["temporal"]
+    build: ./support
+    command: python worker.py
+    init: true
+    volumes:
+      - ${SUPPORT_CODE:-./support}:/app
+    environment: *support-env
+    depends_on:
+      temporal: {condition: service_healthy}
+      payment_provider: {condition: service_healthy}
+
+  # --- workshop tooling: `make buy`, `make board`... ---------------------------
+
+  cli:
+    profiles: ["tools"]
+    build: ./scripts
+    volumes:
+      - ./scripts:/scripts  # edits to the tooling apply without a rebuild
+      - .:/workspace:ro     # the board marks the order in .last-order
+    environment:
+      CHECKOUT_URL: http://checkout:8000
+      INVENTORY_URL: http://inventory:8000
+      PAYMENT_PROVIDER_URL: http://payment_provider:8000
+      SUPPORT_URL: http://support:8000
+      TEMPORAL_UI_URL: http://temporal:8233
