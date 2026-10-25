@@ -122,7 +122,7 @@ You could fix each one by hand: retry loops, a table of where each order got to,
 - **Workflow**: the function that calls the activities in order, like `place_order`.
 - **Worker**: your process. It runs workflows and activities when the Temporal server hands it work.
 
-**Falling behind?** `make solution` shows how your `checkout/` differs from the finished one (`FILE=workflows.py` for one file). `make up-temporal SOLUTION=1` runs the finished version, and `make up-temporal SOLUTION=0` goes back to yours.
+**Falling behind?** `make solution` shows how your `checkout/` differs from the finished one (`FILE=workflows.py` for one file). `make up-temporal SOLUTION=1` runs the finished version, and `make up-temporal SOLUTION=0` (or `make down`) goes back to yours.
 
 ---
 

@@ -1,7 +1,8 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/sh
 
-# SOLUTION=1 swaps your checkout/ and support/ for the ones in solutions/. Remembered in .solution.
+# SOLUTION=1 swaps your checkout/ and support/ for the ones in solutions/. Remembered in .solution
+# until `make down`.
 SOLUTION_ON := $(or $(SOLUTION),$(shell cat .solution 2>/dev/null),0)
 COMPOSE := docker compose $(if $(filter 1,$(SOLUTION_ON)),-f docker-compose.yml -f docker-compose.solutions.yml)
 CODE    := $(if $(filter 1,$(SOLUTION_ON)),solutions/)
@@ -63,8 +64,9 @@ up-temporal: ## Also start the Temporal server and your workers (from step 3 on)
 	@$(COMPOSE) --profile temporal up -d --build --wait --remove-orphans postgres inventory payment_provider checkout support temporal $(WORKERS)
 	@echo "Temporal UI: $(UI_URL)"
 
-down: ## Stop everything. The database and the Temporal history are wiped
+down: ## Stop everything. The database and the Temporal history are wiped, and SOLUTION goes back to 0
 	@$(COMPOSE) --profile temporal --profile tools down --remove-orphans --volumes
+	@rm -f .solution
 
 reset: down ## Start again from a clean slate
 	@rm -f .last-order

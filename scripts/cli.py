@@ -24,7 +24,11 @@ def request(method: str, url: str, **kwargs):
         console.print(f"[bold red]✗ {err.request.url.host} is unreachable[/] [dim]({type(err).__name__})[/]")
         raise typer.Exit(1)
     if response.status_code >= 400:
-        console.print(f"[bold red]✗ {response.status_code}:[/] {response.json().get('detail', response.text)}")
+        try:
+            detail = response.json().get("detail", response.text)
+        except ValueError:  # not JSON, e.g. a plain "Internal Server Error"
+            detail = f"{response.text} (make logs-checkout or make logs-support says why)"
+        console.print(f"[bold red]✗ {response.status_code}:[/] {detail}")
         raise typer.Exit(1)
     return response.json()
 

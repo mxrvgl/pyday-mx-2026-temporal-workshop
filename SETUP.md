@@ -62,7 +62,18 @@ curl -s https://api.anthropic.com/v1/messages \
 
 With `ANTHROPIC_API_KEY` set in your shell, it should print a JSON answer with `"type":"message"`, not an `"error"`.
 
-That's it. You'll get the workshop repository at the start of the session.
+## 5. Get the workshop
+
+Clone the repository, then follow **Before the session** in its README:
+
+```sh
+git clone https://github.com/mxrvgl/pyday-mx-2026-temporal-workshop.git
+cd pyday-mx-2026-temporal-workshop
+make preflight   # checks Docker, Compose, memory and ports
+make setup       # downloads and builds everything (this covers step 3 too)
+```
+
+For Part 2, put your API key in `.env` there: `cp .env.example .env`, then set `ANTHROPIC_API_KEY`.
 
 ## Or let your coding agent check for you
 
@@ -86,8 +97,8 @@ without asking me first.
 6. On Windows: I'm inside a WSL 2 terminal, and Docker Desktop's WSL integration
    is enabled for this distribution.
 
-Then offer to pull these images: postgres:17-alpine, python:3.13-slim,
-temporalio/temporal:1.9.1.
+Then offer to clone https://github.com/mxrvgl/pyday-mx-2026-temporal-workshop
+and, inside it, run `make preflight` and `make setup`.
 
 Report each item as pass or fail. For each failure, give me the exact command or
 setting that fixes it, for my operating system.
